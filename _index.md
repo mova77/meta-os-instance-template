@@ -8,7 +8,8 @@ tags: [os, home, moc]
 
 The map of content for the OS instance. This vault is the meta-layer above every project —
 see [[CLAUDE|CLAUDE.md]] for the instance contract. Skills, systems, templates, and agents
-are mounted from the generic **meta-os** framework repo (symlinked siblings).
+are mounted from the generic **meta-os** framework repo (the `.meta-os` submodule by
+default, or a symlinked sibling checkout in developer mode).
 
 ## The three layers
 

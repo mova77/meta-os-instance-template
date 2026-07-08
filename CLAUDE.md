@@ -5,7 +5,8 @@
 
 This vault is **the OS instance for this machine/estate**: the private layer holding
 project registry, memory, and live automations. The generic framework (skills, systems,
-templates, agents) is the separate **[[meta-os]]** repo, mounted here by symlink:
+templates, agents) is the separate **[[meta-os]]** repo, mounted in as the `.meta-os`
+git submodule (dot-folder, so Obsidian doesn't index framework notes twice):
 
 ```
 {{instance-name}}/              ← PRIVATE instance (this repo) — open THIS as the vault
@@ -14,14 +15,20 @@ templates, agents) is the separate **[[meta-os]]** repo, mounted here by symlink
 ├── memory/                     ← raw → wiki → output — the knowledge, accrues here
 ├── automations/                ← live routine rows
 ├── vaults/                     ← symlinks to federated project vaults
-├── skills/    → ../meta-os/skills      ┐
-├── systems/   → ../meta-os/systems     │ framework mounts — one Obsidian graph,
-├── templates/ → ../meta-os/templates   │ wikilinks resolve in both repos
-└── agents/    → ../meta-os/agents      ┘
+├── .meta-os/                   ← the framework (git submodule, pinned version)
+├── skills/    → .meta-os/skills      ┐
+├── systems/   → .meta-os/systems     │ framework mounts — one Obsidian graph,
+├── templates/ → .meta-os/templates   │ wikilinks resolve in both repos
+└── agents/    → .meta-os/agents      ┘
 ```
 
-**Framework rules apply here** — read `meta-os/CLAUDE.md` (mounted docs describe the
-generic *how*; this file holds only what is instance-specific).
+Framework developers can point the mounts at a sibling `../meta-os` checkout instead:
+`scripts/framework-mode.sh sibling` (and back with `submodule`) — see the framework's
+[[systems/distribution]] for both modes.
+
+**Framework rules apply here** — read the framework's `CLAUDE.md` (at `.meta-os/`, or
+the sibling checkout in sibling mode); mounted docs describe the generic *how*, this
+file holds only what is instance-specific.
 
 ## Instance facts
 
