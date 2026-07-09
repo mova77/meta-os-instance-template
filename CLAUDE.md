@@ -16,10 +16,13 @@ git submodule (dot-folder, so Obsidian doesn't index framework notes twice):
 ├── automations/                ← live routine rows
 ├── vaults/                     ← symlinks to federated project vaults
 ├── .meta-os/                   ← the framework (git submodule, pinned version)
-├── skills/    → .meta-os/skills      ┐
-├── systems/   → .meta-os/systems     │ framework mounts — one Obsidian graph,
-├── templates/ → .meta-os/templates   │ wikilinks resolve in both repos
-└── agents/    → .meta-os/agents      ┘
+├── .packs/                     ← mounted skill packs (pinned submodules; see
+│                                 the framework's systems/packs.md)
+├── skills/                     ← UNION mount: framework + pack skills, as per-skill
+│                                 symlinks — rebuilt by scripts/packs.sh sync
+├── systems/   → .meta-os/systems     ┐
+├── templates/ → .meta-os/templates   │ framework mounts — one Obsidian graph,
+└── agents/    → .meta-os/agents      ┘ wikilinks resolve in both repos
 ```
 
 Framework developers can point the mounts at a sibling `../meta-os` checkout instead:

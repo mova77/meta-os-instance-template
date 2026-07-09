@@ -18,7 +18,10 @@ case "$mode" in
     exit 1
     ;;
 esac
-for d in agents skills systems templates; do
+# agents/systems/templates are whole-folder symlinks; skills/ is a union mount
+# over framework + packs, rebuilt by packs.sh against the new framework root.
+for d in agents systems templates; do
   ln -sfn "$target/$d" "$d"
 done
+"$(dirname "$0")/packs.sh" sync
 echo "framework mounts → $target/*"

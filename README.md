@@ -47,6 +47,22 @@ git submodule update --remote .meta-os   # fetch the latest framework main
 git add .meta-os && git commit -m "chore: bump framework"
 ```
 
+## Skill packs
+
+The framework core ships only generic OS skills; domain skill sets (agile process,
+third-party collections) mount as **packs** — pinned submodules under `.packs/`, unioned
+into `skills/` alongside the framework's own:
+
+```bash
+scripts/packs.sh add superpowers        # from the curated registry (systems/packs.yaml)
+scripts/packs.sh add mypack <repo-url>  # any repo with SKILL.md folders
+scripts/packs.sh list | update | remove <name>
+```
+
+`skills/` is a union of per-skill symlinks (framework wins on name collisions; your own
+real folders in `skills/` are never touched). After bumping the framework or a pack,
+re-run `scripts/packs.sh sync`.
+
 ## Hacking the framework itself? (sibling mode)
 
 Clone `meta-os` next to this repo and flip the mounts:
