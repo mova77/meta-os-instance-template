@@ -83,6 +83,53 @@ manifest_remove() {
   ' "$MANIFEST" > "$MANIFEST.tmp" && mv "$MANIFEST.tmp" "$MANIFEST"
 }
 
+# --- pack config resolution (MOS-20) -----------------------------------------
+# A pack's parameters live under packs.<name>.config in the manifest; the pack
+# declares its schema + defaults in pack.yaml. `config` prints the resolved
+# key=value pairs (defaults filled in) and validates enums against the schema.
+manifest_config() { # <pack> <key> → configured value, empty if unset
+  [ -f "$MANIFEST" ] || return 0
+  awk -v p="$1" -v k="$2:" '
+    $0 ~ "^  "p":" { inpack=1; next }
+    inpack && /^  [a-zA-Z0-9_-]+:/ { inpack=0 }
+    inpack && /^    config:/ { incfg=1; next }
+    incfg && /^    [a-zA-Z]/ { incfg=0 }
+    incfg && $1 == k { $1=""; sub(/^ */,""); gsub(/"/,""); print; exit }
+  ' "$MANIFEST"
+}
+pack_yaml_field() { # <pack> <key> <default|one_of> → value from the pack's pack.yaml inline map
+  local f=".packs/$1/pack.yaml"; [ -f "$f" ] || return 0
+  awk -v k="  $2:" -v want="$3" '
+    index($0,k)==1 {
+      line=$0; sub(/[^{]*{/,"",line); sub(/}.*/,"",line)
+      n=split(line,pairs,","); for(i=1;i<=n;i++){ split(pairs[i],kv,":")
+        g=kv[1]; sub(/^ */,"",g); sub(/ *$/,"",g)
+        if(g==want){ v=substr(pairs[i],index(pairs[i],":")+1); gsub(/[][ ]/,"",v); print v; exit } } }
+  ' "$f"
+}
+cmd_config() {
+  local pack="${1:?usage: packs.sh config <pack> [key]}" key="${2:-}"
+  [ -d ".packs/$pack" ] || die "pack '$pack' is not mounted"
+  local schema=".packs/$pack/pack.yaml" keys
+  if [ -f "$schema" ]; then
+    keys=$(awk '/^config:/{c=1;next} c&&/^  [a-zA-Z]/{k=$1;sub(/:.*/,"",k);print k} c&&/^[a-zA-Z]/{c=0}' "$schema")
+  else
+    keys=$(awk -v p="$pack" '$0~"^  "p":"{ip=1;next} ip&&/^    config:/{c=1;next} c&&/^      [a-zA-Z]/{k=$1;sub(/:.*/,"",k);print k} c&&/^    [a-zA-Z]/{c=0}' "$MANIFEST")
+  fi
+  local k v oneof rc=0
+  for k in $keys; do
+    v=$(manifest_config "$pack" "$k"); [ -z "$v" ] && v=$(pack_yaml_field "$pack" "$k" default)
+    if [ -n "$key" ]; then [ "$k" = "$key" ] && printf '%s\n' "$v"; continue; fi
+    printf '%s=%s\n' "$k" "$v"
+    # one_of is pipe-separated in pack.yaml (commas would break the inline map)
+    oneof=$(pack_yaml_field "$pack" "$k" one_of)
+    if [ -n "$v" ] && [ -n "$oneof" ] && ! printf '|%s|' "$oneof" | grep -q "|$v|"; then
+      echo "warn: $pack.$k='$v' not in {$oneof}" >&2; rc=1
+    fi
+  done
+  return $rc
+}
+
 cmd_sync() {
   local fw; fw=$(fw_root)
   [ -d "$fw/skills" ] || die "framework skills not found at $fw/skills (submodule not initialized?)"
@@ -227,5 +274,6 @@ case "${1:-}" in
   list) cmd_list ;;
   sync) cmd_sync ;;
   apply) cmd_apply ;;
-  *) echo "usage: $0 add <name> [repo-url] | remove <name> | update [name] | list | sync | apply" >&2; exit 1 ;;
+  config) shift; cmd_config "$@" ;;
+  *) echo "usage: $0 add <name> [repo-url] | remove <name> | update [name] | list | sync | apply | config <pack> [key]" >&2; exit 1 ;;
 esac
