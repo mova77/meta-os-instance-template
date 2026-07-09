@@ -29,6 +29,37 @@ registry_field() { # <pack> <field> → value from systems/packs.yaml, empty if 
 # Directory holding a pack's skill folders: skills/ subdir if present, else repo root.
 skills_src() { if [ -d "$1/skills" ]; then echo "$1/skills"; else echo "$1"; fi; }
 
+# --- declarative manifest (.packs.yaml at the instance root) ------------------
+# Desired-state list of packs; `apply` reconciles mounts to it. This is what makes
+# headless installs possible (container/CI: write the manifest, run apply).
+MANIFEST=.packs.yaml
+
+manifest_names() {
+  [ -f "$MANIFEST" ] || return 0
+  awk '/^packs:/{inp=1;next} inp && /^  [a-zA-Z0-9_-]+:/{gsub(/[: ]/,"");print}' "$MANIFEST"
+}
+manifest_repo() { # <name> → repo override, if any
+  [ -f "$MANIFEST" ] || return 0
+  awk -v p="$1" '
+    $0 ~ "^  "p":" { inpack=1; next }
+    inpack && /^  [a-zA-Z0-9_-]+:/ { inpack=0 }
+    inpack && $1 == "repo:" { print $2; exit }
+  ' "$MANIFEST"
+}
+manifest_add() {
+  [ -f "$MANIFEST" ] || printf '# Desired packs — reconciled by scripts/packs.sh apply\npacks:\n' > "$MANIFEST"
+  grep -q "^  $1:" "$MANIFEST" && return 0
+  { echo "  $1:"; [ -n "${2:-}" ] && echo "    repo: $2"; } >> "$MANIFEST"
+}
+manifest_remove() {
+  [ -f "$MANIFEST" ] || return 0
+  awk -v p="$1" '
+    $0 ~ "^  "p":" { skip=1; next }
+    skip && /^    / { next }
+    { skip=0; print }
+  ' "$MANIFEST" > "$MANIFEST.tmp" && mv "$MANIFEST.tmp" "$MANIFEST"
+}
+
 cmd_sync() {
   local fw; fw=$(fw_root)
   [ -d "$fw/skills" ] || die "framework skills not found at $fw/skills (submodule not initialized?)"
@@ -113,8 +144,9 @@ cmd_add() {
     echo "warn: '$name' is not from the curated registry — provenance unverified" >&2
   fi
   git submodule add -f "$url" ".packs/$name"
+  manifest_add "$name" "${2:-}"
   cmd_sync
-  echo "mounted. Review, then: git add .gitmodules .packs/$name skills && git commit"
+  echo "mounted. Review, then: git add .gitmodules .packs.yaml .packs/$name skills .claude && git commit"
 }
 
 cmd_remove() {
@@ -123,7 +155,29 @@ cmd_remove() {
   git submodule deinit -f ".packs/$name"
   git rm -f ".packs/$name"
   rm -rf ".git/modules/.packs/$name"
+  manifest_remove "$name"
   cmd_sync
+}
+
+# Reconcile mounted packs to the manifest — idempotent, headless-safe.
+cmd_apply() {
+  local name p
+  for name in $(manifest_names); do
+    if [ ! -d ".packs/$name" ]; then
+      echo "apply: mounting '$name'"
+      cmd_add "$name" "$(manifest_repo "$name")" || echo "apply: '$name' failed — continuing" >&2
+    fi
+  done
+  for p in .packs/*/; do
+    [ -d "$p" ] || continue
+    name=$(basename "$p")
+    if ! manifest_names | grep -qx "$name"; then
+      echo "apply: unmounting '$name' (not in $MANIFEST)"
+      cmd_remove "$name"
+    fi
+  done
+  cmd_sync
+  echo "apply: state matches $MANIFEST"
 }
 
 cmd_update() {
@@ -150,5 +204,6 @@ case "${1:-}" in
   update) shift; cmd_update "${1:-}" ;;
   list) cmd_list ;;
   sync) cmd_sync ;;
-  *) echo "usage: $0 add <name> [repo-url] | remove <name> | update [name] | list | sync" >&2; exit 1 ;;
+  apply) cmd_apply ;;
+  *) echo "usage: $0 add <name> [repo-url] | remove <name> | update [name] | list | sync | apply" >&2; exit 1 ;;
 esac
