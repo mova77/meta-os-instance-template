@@ -49,7 +49,12 @@ manifest_repo() { # <name> → repo override, if any
 manifest_add() {
   [ -f "$MANIFEST" ] || printf '# Desired packs — reconciled by scripts/packs.sh apply\npacks:\n' > "$MANIFEST"
   grep -q "^  $1:" "$MANIFEST" && return 0
-  { echo "  $1:"; [ -n "${2:-}" ] && echo "    repo: $2"; } >> "$MANIFEST"
+  # Registry packs carry no repo: line (URL lives in the registry). Guard the
+  # optional line with an explicit if — a bare `[ -n "$2" ] && echo` returns
+  # non-zero when $2 is empty and would trip `set -e`, aborting the caller.
+  echo "  $1:" >> "$MANIFEST"
+  if [ -n "${2:-}" ]; then echo "    repo: $2" >> "$MANIFEST"; fi
+  return 0
 }
 manifest_remove() {
   [ -f "$MANIFEST" ] || return 0
