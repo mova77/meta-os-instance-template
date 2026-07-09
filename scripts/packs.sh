@@ -26,8 +26,26 @@ registry_field() { # <pack> <field> → value from systems/packs.yaml, empty if 
   ' systems/packs.yaml
 }
 
-# Directory holding a pack's skill folders: skills/ subdir if present, else repo root.
-skills_src() { if [ -d "$1/skills" ]; then echo "$1/skills"; else echo "$1"; fi; }
+# Emit the skill folders a pack provides, one repo-relative path per line.
+# Two layouts, in priority order:
+#   1. .claude-plugin/plugin.json present → its skills[] paths are AUTHORITATIVE
+#      (respects the author's own inclusions/exclusions, e.g. skipping deprecated/).
+#   2. otherwise → discover SKILL.md recursively (any depth), so category-nested
+#      collections (skills/<category>/<skill>/) and flat ones both work.
+pack_skill_dirs() {
+  local p="$1" rel
+  if [ -f "$p/.claude-plugin/plugin.json" ]; then
+    # every "./…" token in the manifest is a skill path (name/desc carry no ./)
+    grep -o '"\./[^"]*"' "$p/.claude-plugin/plugin.json" | tr -d '"' | while read -r rel; do
+      rel="${rel#./}"
+      [ -f "$p/$rel/SKILL.md" ] && echo "$p/$rel"
+    done
+  else
+    find "$p" -name .git -prune -o -name SKILL.md -print 2>/dev/null | while read -r f; do
+      dirname "$f"
+    done
+  fi
+}
 
 # --- declarative manifest (.packs.yaml at the instance root) ------------------
 # Desired-state list of packs; `apply` reconciles mounts to it. This is what makes
@@ -78,18 +96,17 @@ cmd_sync() {
     [ -e "skills/$name" ] || ln -s "../$fw/skills/$name" "skills/$name"
   done
   [ -e skills/_index.md ] || ln -s "../$fw/skills/_index.md" skills/_index.md
-  # then packs, in mount-name order
-  local p pname src
+  # then packs, in mount-name order — each pack's layout resolved by pack_skill_dirs
+  local p pname
   for p in .packs/*/; do
     [ -d "$p" ] || continue
-    pname=$(basename "$p"); src=$(skills_src ".packs/$pname")
-    for d in "$src"/*/; do
-      [ -f "${d}SKILL.md" ] || continue
+    pname=$(basename "$p")
+    pack_skill_dirs ".packs/$pname" | while read -r d; do
       name=$(basename "$d")
       if [ -e "skills/$name" ]; then
         echo "warn: '$name' from pack '$pname' is shadowed by an existing skill — skipped" >&2
       else
-        ln -s "../$src/$name" "skills/$name"
+        ln -s "../$d" "skills/$name"
       fi
     done
   done
@@ -198,7 +215,7 @@ cmd_list() {
     [ -d "$p" ] || { echo "no packs mounted"; return; }
     pname=$(basename "$p")
     pin=$(git -C "$p" rev-parse --short HEAD 2>/dev/null || echo "?")
-    n=$(find "$(skills_src ".packs/$pname")" -maxdepth 2 -name SKILL.md 2>/dev/null | wc -l | tr -d ' ')
+    n=$(pack_skill_dirs ".packs/$pname" | wc -l | tr -d ' ')
     echo "$pname  @$pin  ($n skills)"
   done
 }
