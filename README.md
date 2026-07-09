@@ -24,7 +24,9 @@ per-folder symlinks. **One clone and you're running.**
 4. Open the instance repo as your Obsidian vault — wikilinks resolve across both repos
    because they're vault-root-relative (`.meta-os/` itself stays out of the graph:
    Obsidian ignores dot-folders, so framework notes aren't indexed twice).
-5. For machine-global skill discovery in Claude Code:
+5. *(Optional)* Project-local discovery is already wired — `.claude/skills/` mirrors the
+   union, so Claude Code sessions inside this repo see everything with zero setup. For
+   **machine-global** discovery too (skills usable from any directory):
    ```bash
    for s in "$(pwd)"/skills/*/; do
      ln -s "$s" ~/.claude/skills/"$(basename "$s")"
@@ -60,8 +62,12 @@ scripts/packs.sh list | update | remove <name>
 ```
 
 `skills/` is a union of per-skill symlinks (framework wins on name collisions; your own
-real folders in `skills/` are never touched). After bumping the framework or a pack,
-re-run `scripts/packs.sh sync`.
+real folders in `skills/` are never touched). Mounting also enriches the project-local
+**`.claude/`** engine surface: `.claude/skills/` mirrors the union, pack `agents/` land
+in `.claude/agents/`, and pack `hooks/` are **staged** under `.claude/hooks/<pack>/` —
+never auto-wired into `settings.json`; enabling an executable hook is always your
+explicit, per-hook decision. After bumping the framework or a pack, re-run
+`scripts/packs.sh sync`.
 
 ## Hacking the framework itself? (sibling mode)
 

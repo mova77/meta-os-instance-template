@@ -58,6 +58,44 @@ cmd_sync() {
     done
   done
   echo "skills/ union rebuilt — $(find skills -maxdepth 1 -mindepth 1 | wc -l | tr -d ' ') entries"
+  sync_claude
+}
+
+# Project-local .claude/ enrichment — the engine's discovery surface. Skills mirror
+# the union; agents come from packs (framework agents/ is a docs roster, not engine
+# definitions). Pack HOOKS are STAGED under .claude/hooks/<pack>/ but never wired
+# into settings.json automatically — enabling third-party executable hooks is an
+# explicit, per-hook user decision.
+sync_claude() {
+  mkdir -p .claude/skills .claude/agents .claude/hooks
+  local d name p pname f b
+  find .claude/skills -maxdepth 1 -type l -exec rm {} +
+  for d in skills/*/; do
+    name=$(basename "$d")
+    [ -e ".claude/skills/$name" ] || ln -s "../../skills/$name" ".claude/skills/$name"
+  done
+  find .claude/agents -maxdepth 1 -type l -exec rm {} +
+  find .claude/hooks -maxdepth 1 -type l -exec rm {} +
+  for p in .packs/*/; do
+    [ -d "$p" ] || continue
+    pname=$(basename "$p")
+    if [ -d "${p}agents" ]; then
+      for f in "${p}agents"/*.md; do
+        [ -f "$f" ] || continue
+        b=$(basename "$f")
+        if [ -e ".claude/agents/$b" ]; then
+          echo "warn: agent '$b' from pack '$pname' collides — skipped" >&2
+        else
+          ln -s "../../.packs/$pname/agents/$b" ".claude/agents/$b"
+        fi
+      done
+    fi
+    if [ -d "${p}hooks" ]; then
+      ln -sfn "../../.packs/$pname/hooks" ".claude/hooks/$pname"
+      echo "hooks from '$pname' staged at .claude/hooks/$pname — review and wire explicitly in .claude/settings.json (never auto-enabled)"
+    fi
+  done
+  echo ".claude/ enriched — $(find .claude/skills -maxdepth 1 -type l | wc -l | tr -d ' ') skills, $(find .claude/agents -maxdepth 1 -type l | wc -l | tr -d ' ') agents"
 }
 
 cmd_add() {
