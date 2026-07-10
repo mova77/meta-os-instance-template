@@ -57,8 +57,10 @@ into `skills/` alongside the framework's own:
 
 ```bash
 scripts/packs.sh add superpowers        # from the curated registry (systems/packs.yaml)
-scripts/packs.sh add mypack <repo-url>  # any repo with SKILL.md folders
+scripts/packs.sh add mypack <repo-url>  # any repo with SKILL.md folders (flat, nested, or plugin.json)
 scripts/packs.sh list | update | remove <name>
+scripts/packs.sh apply                  # reconcile mounts to .packs.yaml (headless-safe)
+scripts/packs.sh config <pack> [key]    # resolve a pack's parameters + validate
 ```
 
 `skills/` is a union of per-skill symlinks (framework wins on name collisions; your own
@@ -68,6 +70,17 @@ in `.claude/agents/`, and pack `hooks/` are **staged** under `.claude/hooks/<pac
 never auto-wired into `settings.json`; enabling an executable hook is always your
 explicit, per-hook decision. After bumping the framework or a pack, re-run
 `scripts/packs.sh sync`.
+
+**Declarative & headless.** `.packs.yaml` is the desired-state list of packs; `add`/
+`remove` maintain it and `apply` reconciles to it (idempotent) — so a container or CI can
+install packs with no conversation: write the manifest and run `apply`.
+
+**Parameterised packs.** A pack that ships a `pack.yaml` carries the method; your choices
+live under `packs.<name>.config` in `.packs.yaml`. The agile pack, for example, takes a
+`profile` (`scrum` | `kanban`) plus `tracker`/`space`/`mirror-repo` — switching
+methodology is one line, not a fork. `scripts/packs.sh config <pack>` prints the resolved
+values. See the framework's [`systems/packs.md`](.meta-os/systems/packs.md) for the full
+contract.
 
 ## Hacking the framework itself? (sibling mode)
 
