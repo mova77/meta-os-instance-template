@@ -1,4 +1,4 @@
 [submodule ".meta-os"]
 	path = .meta-os
-	url = https://github.com/mova77/meta-os.git
+	url = https://github.com/meta-agentic/meta-os.git
 	branch = main
